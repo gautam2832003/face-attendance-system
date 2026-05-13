@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Payroll Management{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+    <nav class="dashboard-nav glass">
+        <div class="nav-brand"><i class="fas fa-brain"></i><span>FaceTrack</span></div>
+        <div class="nav-links" style="display:flex;gap:8px;">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-link"><i class="fas fa-home"></i></a>
+            <a href="{{ url_for('admin_payroll') }}" class="nav-link"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+            <a href="{{ url_for('admin_ml') }}" class="nav-link"><i class="fas fa-brain"></i> ML</a>
+            <a href="{{ url_for('admin_tasks') }}" class="nav-link"><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{{ url_for('admin_mail') }}" class="nav-link"><i class="fas fa-envelope"></i> Mail</a>
+        </div>
+        <div class="nav-user">
+            <span class="nav-greeting"><i class="fas fa-user-shield"></i> {{ admin_name }}</span>
+            <a href="{{ url_for('logout') }}" class="nav-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+    <div class="dashboard-content">
+        <div class="welcome-section">
+            <h1><span class="gradient-text">Payroll Management</span></h1>
+            <p>Generate and manage employee salaries, bonuses, and deductions</p>
+        </div>
+        <div class="dashboard-card glass" style="margin-bottom:24px;">
+            <div class="card-header">
+                <h2><i class="fas fa-cog"></i> Payroll Controls</h2>
+            </div>
+            <div class="card-body">
+                <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:end;">
+                    <div class="input-group" style="flex:1;min-width:120px;">
+                        <label>Month</label>
+                        <input type="number" id="payroll-month" min="1" max="12" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text-primary);">
+                    </div>
+                    <div class="input-group" style="flex:1;min-width:120px;">
+                        <label>Year</label>
+                        <input type="number" id="payroll-year" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text-primary);">
+                    </div>
+                    <button class="btn-success glow-btn" onclick="generatePayroll()"><i class="fas fa-plus"></i> Generate Payroll</button>
+                    <button class="btn-primary" onclick="loadPayrolls()"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+            </div>
+        </div>
+        <div class="dashboard-card glass">
+            <div class="card-header">
+                <h2><i class="fas fa-file-invoice"></i> Payroll Records</h2>
+                <div style="display:flex;gap:8px;">
+                    <input type="number" id="filter-month" placeholder="Month" style="width:80px;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:8px 10px;color:var(--text-primary);">
+                    <input type="number" id="filter-year" placeholder="Year" style="width:80px;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:8px 10px;color:var(--text-primary);">
+                    <button class="btn-sm btn-primary" onclick="loadPayrolls()"><i class="fas fa-filter"></i></button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-container">
+                    <table class="attendance-table">
+                        <thead><tr><th>Emp Code</th><th>Name</th><th>Dept</th><th>Month</th><th>Salary</th><th>Bonus</th><th>Deductions</th><th>Net</th><th>Status</th><th>Action</th></tr></thead>
+                        <tbody id="payroll-tbody"><tr><td colspan="10" class="loading-cell">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const now = new Date();
+    document.getElementById('payroll-month').value = now.getMonth() + 1;
+    document.getElementById('payroll-year').value = now.getFullYear();
+    loadPayrolls();
+});
+
+async function loadPayrolls() {
+    const month = document.getElementById('filter-month').value;
+    const year = document.getElementById('filter-year').value;
+    let url = '{{ url_for("get_payrolls") }}';
+    const params = new URLSearchParams();
+    if (month) params.set('month', month);
+    if (year) params.set('year', year);
+    const qs = params.toString();
+    if (qs) url += '?' + qs;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const tbody = document.getElementById('payroll-tbody');
+        if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="10" class="empty-cell">No payroll records</td></tr>'; return; }
+        tbody.innerHTML = data.map(p => {
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return `<tr>
+                <td><span class="roll-badge">${p.employee_code}</span></td>
+                <td><strong>${p.employee_name}</strong></td>
+                <td>${p.department}</td>
+                <td>${months[p.month-1]} ${p.year}</td>
+                <td>$${p.salary_amount.toFixed(2)}</td>
+                <td style="color:var(--success);">+$${p.bonus.toFixed(2)}</td>
+                <td style="color:var(--danger);">-$${p.deductions.toFixed(2)}</td>
+                <td><strong>$${p.net_salary.toFixed(2)}</strong></td>
+                <td><span class="status-badge ${p.status}">${p.status}</span></td>
+                <td class="action-cell">
+                    ${p.status === 'unpaid' ? `<button class="btn-sm btn-success" onclick="payPayroll('${p.id}')"><i class="fas fa-check"></i> Pay</button>
+                    <button class="btn-sm btn-danger" onclick="deletePayroll('${p.id}')"><i class="fas fa-trash"></i></button>` :
+                    `<span style="color:var(--text-muted);font-size:0.8rem;">${p.paid_date ? p.paid_date.substring(0,10) : 'Paid'}</span>`}
+                </td>
+            </tr>`;
+        }).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function generatePayroll() {
+    const month = document.getElementById('payroll-month').value;
+    const year = document.getElementById('payroll-year').value;
+    showLoading();
+    try {
+        const res = await fetch('{{ url_for("generate_payroll") }}', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month: parseInt(month), year: parseInt(year) })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) { showNotification(data.message, 'success'); loadPayrolls(); }
+        else { showNotification(data.error || 'Failed', 'error'); }
+    } catch (e) { hideLoading(); showNotification('Connection error', 'error'); }
+}
+
+async function payPayroll(id) {
+    const bonus = prompt('Bonus amount (optional):', '0');
+    if (bonus === null) return;
+    const deductions = prompt('Deductions (optional):', '0');
+    if (deductions === null) return;
+    showLoading();
+    try {
+        const res = await fetch(`/api/admin/payroll/${id}/pay`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bonus: parseFloat(bonus) || 0, deductions: parseFloat(deductions) || 0 })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) { showNotification('Payroll paid!', 'success'); loadPayrolls(); }
+        else { showNotification(data.error || 'Failed', 'error'); }
+    } catch (e) { hideLoading(); showNotification('Connection error', 'error'); }
+}
+
+async function deletePayroll(id) {
+    if (!confirm('Delete this payroll record?')) return;
+    try {
+        const res = await fetch(`/api/admin/payroll/${id}`, { method: 'DELETE' });
+        if (res.ok) { showNotification('Deleted', 'success'); loadPayrolls(); }
+    } catch (e) { showNotification('Error', 'error'); }
+}
+</script>
+{% endblock %}

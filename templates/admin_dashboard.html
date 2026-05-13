@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+    <nav class="dashboard-nav glass">
+        <div class="nav-brand">
+            <i class="fas fa-brain"></i>
+            <span>FaceTrack</span>
+        </div>
+        <div class="nav-links" style="display:flex;gap:8px;">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-link"><i class="fas fa-home"></i></a>
+            <a href="{{ url_for('admin_payroll') }}" class="nav-link"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+            <a href="{{ url_for('admin_ml') }}" class="nav-link"><i class="fas fa-brain"></i> ML</a>
+            <a href="{{ url_for('admin_tasks') }}" class="nav-link"><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{{ url_for('admin_mail') }}" class="nav-link"><i class="fas fa-envelope"></i> Mail</a>
+        </div>
+        <div class="nav-user">
+            <span class="nav-greeting"><i class="fas fa-user-shield"></i> {{ admin_name }}</span>
+            <a href="{{ url_for('logout') }}" class="nav-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-content">
+        <div class="welcome-section">
+            <h1>Admin Dashboard, <span class="gradient-text">{{ admin_name }}</span></h1>
+            <p>Manage employees, attendance, payroll, and ML models</p>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card glass stat-primary">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="total-employees">0</span>
+                    <span class="stat-label">Total Employees</span>
+                </div>
+            </div>
+            <div class="stat-card glass stat-success">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="today-present">0</span>
+                    <span class="stat-label">Present Today</span>
+                </div>
+            </div>
+            <div class="stat-card glass stat-danger">
+                <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="today-absent">0</span>
+                    <span class="stat-label">Absent Today</span>
+                </div>
+            </div>
+            <div class="stat-card glass stat-accent">
+                <div class="stat-icon"><i class="fas fa-face-smile"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="face-registered">0</span>
+                    <span class="stat-label">Face Registered</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card glass full-width-card" id="camera-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-video"></i> Face Recognition Check-In/Out</h2>
+                    <div class="card-actions">
+                        <button class="btn-success glow-btn" id="start-camera-btn" onclick="startCamera()"><i class="fas fa-play"></i> Start Camera</button>
+                        <button class="btn-danger" id="stop-camera-btn" style="display:none;" onclick="stopCamera()"><i class="fas fa-stop"></i> Stop</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="camera-main">
+                        <div class="camera-feed-container">
+                            <video id="camera-feed" autoplay playsinline poster></video>
+                            <canvas id="camera-canvas" style="display:none;"></canvas>
+                            <div class="camera-overlay" id="camera-overlay">
+                                <div class="scan-frame">
+                                    <div class="scan-corner tl"></div>
+                                    <div class="scan-corner tr"></div>
+                                    <div class="scan-corner bl"></div>
+                                    <div class="scan-corner br"></div>
+                                    <div class="scan-line-h"></div>
+                                </div>
+                            </div>
+                            <div class="recognition-result" id="recognition-result" style="display:none;">
+                                <div class="result-content glass">
+                                    <i class="fas fa-check-circle result-icon" id="result-icon"></i>
+                                    <h3 id="result-name">Name</h3>
+                                    <p id="result-info">---</p>
+                                    <p id="result-action">Action: ---</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="camera-controls">
+                            <div class="recognition-status" id="recognition-status">
+                                <span class="status-dot"></span> Camera Off
+                            </div>
+                            <div class="recognition-log" id="recognition-log">
+                                <h4><i class="fas fa-list"></i> Recent Activity</h4>
+                                <div class="log-entries" id="log-entries">
+                                    <div class="log-empty">No activity yet.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card glass full-width-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-users"></i> Employee List & Manual Attendance</h2>
+                    <div class="card-actions">
+                        <button class="btn-primary" onclick="refreshEmployeeList()"><i class="fas fa-sync"></i> Refresh</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="attendance-table" id="employee-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th><th>Name</th><th>Department</th><th>Face</th><th>Status</th><th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employee-tbody">
+                                <tr><td colspan="6" class="loading-cell">Loading employees...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let cameraStream = null;
+let recognitionInterval = null;
+let isRecognizing = false;
+let recognizedToday = new Set();
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadAdminStats();
+    loadEmployeeList();
+});
+
+async function loadAdminStats() {
+    try {
+        const res = await fetch('{{ url_for("admin_stats") }}');
+        const data = await res.json();
+        animateCounter('total-employees', data.total_employees);
+        animateCounter('today-present', data.today_present);
+        animateCounter('today-absent', data.today_absent);
+        animateCounter('face-registered', data.face_registered);
+    } catch (e) { console.error(e); }
+}
+
+async function loadEmployeeList() {
+    try {
+        const res = await fetch('{{ url_for("get_employees") }}');
+        const employees = await res.json();
+        const summaryRes = await fetch('{{ url_for("admin_attendance_summary") }}');
+        const summary = await summaryRes.json();
+        const statusMap = {};
+        summary.employees.forEach(s => { statusMap[s.id] = s; });
+        const tbody = document.getElementById('employee-tbody');
+        if (employees.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">No employees registered</td></tr>';
+            return;
+        }
+        tbody.innerHTML = employees.map(e => {
+            const today = statusMap[e.id] || { status: 'unmarked', marked: false };
+            const faceIcon = e.has_face ? 'fa-check-circle has-face' : 'fa-times-circle no-face';
+            const sc = today.status === 'present' ? 'status-present' : today.status === 'absent' ? 'status-absent' : 'status-unmarked';
+            return `<tr>
+                <td><span class="roll-badge">${e.employee_code}</span></td>
+                <td><strong>${e.name}</strong></td>
+                <td>${e.department}</td>
+                <td><i class="fas ${faceIcon}"></i></td>
+                <td><span class="status-badge ${today.status}">${today.status}</span></td>
+                <td class="action-cell">
+                    ${!today.marked ? `
+                        <button class="btn-sm btn-success" onclick="markEmployee('${e.id}','present')"><i class="fas fa-check"></i> Present</button>
+                        <button class="btn-sm btn-danger" onclick="markEmployee('${e.id}','absent')"><i class="fas fa-times"></i> Absent</button>
+                    ` : `
+                        <button class="btn-sm btn-warning" onclick="markEmployee('${e.id}','present')"><i class="fas fa-edit"></i> Change</button>
+                    `}
+                </td>
+            </tr>`;
+        }).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function markEmployee(employeeId, status) {
+    showLoading();
+    try {
+        const res = await fetch('{{ url_for("admin_mark_manual") }}', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: employeeId, status })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) { showNotification(`Marked as ${status}`, 'success'); loadEmployeeList(); loadAdminStats(); }
+        else { showNotification(data.error || 'Failed', 'error'); }
+    } catch (e) { hideLoading(); showNotification('Connection error', 'error'); }
+}
+
+function refreshEmployeeList() { loadEmployeeList(); showNotification('List refreshed', 'success'); }
+
+async function startCamera() {
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+        const video = document.getElementById('camera-feed');
+        video.srcObject = cameraStream;
+        document.getElementById('start-camera-btn').style.display = 'none';
+        document.getElementById('stop-camera-btn').style.display = 'inline-flex';
+        document.getElementById('recognition-status').innerHTML = '<span class="status-dot active"></span> Camera Active';
+        document.getElementById('camera-overlay').style.display = 'block';
+        startRecognition();
+    } catch (e) { showNotification('Camera access denied.', 'error'); }
+}
+
+function stopCamera() {
+    if (recognitionInterval) { clearInterval(recognitionInterval); recognitionInterval = null; }
+    isRecognizing = false;
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+    document.getElementById('camera-feed').srcObject = null;
+    document.getElementById('start-camera-btn').style.display = 'inline-flex';
+    document.getElementById('stop-camera-btn').style.display = 'none';
+    document.getElementById('recognition-status').innerHTML = '<span class="status-dot"></span> Camera Off';
+    document.getElementById('camera-overlay').style.display = 'none';
+    document.getElementById('recognition-result').style.display = 'none';
+}
+
+function startRecognition() {
+    isRecognizing = true;
+    const logEntries = document.getElementById('log-entries');
+    recognitionInterval = setInterval(async () => {
+        if (!isRecognizing) return;
+        const video = document.getElementById('camera-feed');
+        if (!video.videoWidth) return;
+        const canvas = document.getElementById('camera-canvas');
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        const imageData = canvas.toDataURL('image/jpeg', 0.7);
+        try {
+            const res = await fetch('{{ url_for("admin_recognize_face") }}', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData })
+            });
+            const data = await res.json();
+            if (data.matched) {
+                const rd = document.getElementById('recognition-result');
+                document.getElementById('result-name').textContent = data.employee.name;
+                document.getElementById('result-info').textContent = `${data.employee.employee_code} | ${data.employee.department}`;
+                const actionEl = document.getElementById('result-action');
+                const iconEl = document.getElementById('result-icon');
+                rd.style.display = 'block';
+                if (data.action === 'check_in') {
+                    actionEl.textContent = '✓ Checked In at ' + data.time;
+                    iconEl.className = 'fas fa-check-circle result-icon success';
+                } else if (data.action === 'check_out') {
+                    actionEl.textContent = '↗ Checked Out at ' + data.time;
+                    iconEl.className = 'fas fa-sign-out-alt result-icon info';
+                } else {
+                    actionEl.textContent = 'Already completed today (In: ' + data.check_in + ' Out: ' + data.check_out + ')';
+                    iconEl.className = 'fas fa-info-circle result-icon info';
+                }
+                if (!recognizedToday.has(data.employee.id)) {
+                    recognizedToday.add(data.employee.id);
+                    const entry = document.createElement('div');
+                    entry.className = `log-entry log-success`;
+                    entry.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span>
+                        <span class="log-name">${data.employee.name}</span>
+                        <span class="log-status">${data.action}</span>`;
+                    logEntries.insertBefore(entry, logEntries.firstChild);
+                    const empty = logEntries.querySelector('.log-empty');
+                    if (empty) empty.remove();
+                    loadEmployeeList(); loadAdminStats();
+                }
+                setTimeout(() => { if (rd.style.display !== 'none') rd.style.display = 'none'; }, 4000);
+            } else {
+                document.getElementById('recognition-result').style.display = 'none';
+            }
+        } catch (e) { console.error(e); }
+    }, 3000);
+}
+
+function animateCounter(id, target, suffix = '') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let current = 0;
+    const step = Math.max(1, Math.floor(target / 30));
+    const interval = setInterval(() => {
+        current += step;
+        if (current >= target) { current = target; clearInterval(interval); }
+        el.textContent = current + suffix;
+    }, 30);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}FaceTrack AI | Enterprise{% endblock %}
+{% block content %}
+<div class="landing-page">
+    <nav class="navbar glass">
+        <div class="nav-brand">
+            <i class="fas fa-brain"></i>
+            <span>FaceTrack AI</span>
+        </div>
+        <div class="nav-links">
+            <a href="#features" class="nav-link"><i class="fas fa-cubes"></i> Features</a>
+            <a href="#about" class="nav-link"><i class="fas fa-info-circle"></i> About</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge glass">
+                <i class="fas fa-robot"></i> Powered by ML (RF, SVM, Decision Tree)
+            </div>
+            <h1 class="hero-title">
+                <span class="gradient-text">AI-Powered</span>
+                <br>Employee Attendance System
+            </h1>
+            <p class="hero-subtitle">
+                Enterprise-grade face recognition with payroll, task management, and intelligent ML model training.
+                Real-time, contactless, and data-driven.
+            </p>
+            <div class="hero-actions">
+                <div class="role-card teacher-card glass" onclick="location.href='{{ url_for('admin_login') }}'">
+                    <div class="role-icon"><i class="fas fa-user-shield"></i></div>
+                    <h3>Admin</h3>
+                    <p>Manage employees, payroll, ML models, and tasks</p>
+                    <div class="role-btn">
+                        <span>Login</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+                <div class="role-card student-card glass" onclick="location.href='{{ url_for('employee_login') }}'">
+                    <div class="role-icon"><i class="fas fa-user-tie"></i></div>
+                    <h3>Employee</h3>
+                    <p>Face check-in, tasks, mail, and salary dashboard</p>
+                    <div class="role-btn">
+                        <span>Login</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-extra">
+                <span>New here?</span>
+                <a href="{{ url_for('admin_register') }}" class="inline-link">Register as Admin</a>
+                <span class="sep">|</span>
+                <a href="{{ url_for('employee_register') }}" class="inline-link">Register as Employee</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="face-scan-animation">
+                <div class="scan-ring"></div>
+                <div class="scan-ring ring-2"></div>
+                <div class="scan-ring ring-3"></div>
+                <div class="scan-icon"><i class="fas fa-user-circle"></i></div>
+                <div class="scan-line"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features-section">
+        <h2 class="section-title"><span class="gradient-text">Enterprise Features</span></h2>
+        <div class="features-grid">
+            <div class="feature-card glass">
+                <div class="feature-icon"><i class="fas fa-face-smile"></i></div>
+                <h3>Face Recognition</h3>
+                <p>Advanced ML-powered facial recognition with Random Forest, SVM & Decision Tree models for check-in/out.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon"><i class="fas fa-brain"></i></div>
+                <h3>ML Model Training</h3>
+                <p>Train & compare Random Forest, SVM, and Decision Tree models. View accuracy, precision, recall & F1 scores.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon"><i class="fas fa-file-csv"></i></div>
+                <h3>CSV Dataset Export</h3>
+                <p>Auto-generate CSV datasets from face encodings for external analysis and model retraining.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon"><i class="fas fa-money-bill-wave"></i></div>
+                <h3>Payroll Management</h3>
+                <p>Automated salary calculation, bonus & deduction handling, and payment tracking per employee.</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon"><i class="fas fa-tasks"></i></div>
+                <h3>Task Management</h3>
+                <p>Assign daily tasks to employees, track progress with status updates (pending, in-progress, completed).</p>
+            </div>
+            <div class="feature-card glass">
+                <div class="feature-icon"><i class="fas fa-envelope"></i></div>
+                <h3>Internal Mail</h3>
+                <p>Bidirectional messaging between admin and employees for seamless workplace communication.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer glass">
+        <p>&copy; 2026 FaceTrack AI — Enterprise Attendance & Payroll System</p>
+    </footer>
+</div>
+
+<script>
+    particlesJS('particles-js', {
+        particles: {
+            number: { value: 80, density: { enable: true, value_area: 800 } },
+            color: { value: '#00d4ff' },
+            shape: { type: 'circle' },
+            opacity: { value: 0.3, random: true },
+            size: { value: 3, random: true },
+            line_linked: { enable: true, distance: 150, color: '#00d4ff', opacity: 0.2, width: 1 },
+            move: { enable: true, speed: 2, direction: 'none', random: true }
+        },
+        interactivity: {
+            detect_on: 'canvas',
+            events: { onhover: { enable: true, mode: 'grab' }, onclick: { enable: true, mode: 'push' } },
+            modes: { grab: { distance: 140, line_linked: { opacity: 0.5 } }, push: { particles_nb: 4 } }
+        }
+    });
+</script>
+{% endblock %}

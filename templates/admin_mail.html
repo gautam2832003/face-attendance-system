@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Admin Mail{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+    <nav class="dashboard-nav glass">
+        <div class="nav-brand"><i class="fas fa-brain"></i><span>FaceTrack</span></div>
+        <div class="nav-links" style="display:flex;gap:8px;">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-link"><i class="fas fa-home"></i></a>
+            <a href="{{ url_for('admin_payroll') }}" class="nav-link"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+            <a href="{{ url_for('admin_ml') }}" class="nav-link"><i class="fas fa-brain"></i> ML</a>
+            <a href="{{ url_for('admin_tasks') }}" class="nav-link"><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{{ url_for('admin_mail') }}" class="nav-link"><i class="fas fa-envelope"></i> Mail</a>
+        </div>
+        <div class="nav-user">
+            <span class="nav-greeting"><i class="fas fa-user-shield"></i> {{ admin_name }}</span>
+            <a href="{{ url_for('logout') }}" class="nav-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+    <div class="dashboard-content">
+        <div class="welcome-section">
+            <h1><span class="gradient-text">Internal Mail</span></h1>
+            <p>Communicate with employees</p>
+        </div>
+
+        <div class="dashboard-card glass" style="margin-bottom:24px;">
+            <div class="card-header">
+                <h2><i class="fas fa-paper-plane"></i> Send Message</h2>
+            </div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div class="input-group">
+                        <label>To</label>
+                        <select id="mail-receiver" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;">
+                            <option value="">Select employee...</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Subject</label>
+                        <input type="text" id="mail-subject" placeholder="Subject" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Message</label>
+                    <textarea id="mail-message" rows="4" placeholder="Write your message..." style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;resize:vertical;font-family:var(--font-main);"></textarea>
+                </div>
+                <button class="btn-success glow-btn" onclick="sendMail()"><i class="fas fa-paper-plane"></i> Send</button>
+            </div>
+        </div>
+
+        <div class="dashboard-card glass">
+            <div class="card-header">
+                <h2><i class="fas fa-inbox"></i> Inbox</h2>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-sm btn-primary" onclick="loadMail('inbox')"><i class="fas fa-inbox"></i> Inbox</button>
+                    <button class="btn-sm btn-secondary" onclick="loadMail('sent')"><i class="fas fa-paper-plane"></i> Sent</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="mail-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadEmployees();
+    loadMail('inbox');
+});
+
+async function loadEmployees() {
+    try {
+        const res = await fetch('{{ url_for("get_employees") }}');
+        const data = await res.json();
+        const sel = document.getElementById('mail-receiver');
+        sel.innerHTML = '<option value="">Select employee...</option>' + data.map(e => `<option value="${e.id}">${e.name} (${e.employee_code})</option>`).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function loadMail(type) {
+    try {
+        const res = await fetch('/api/admin/mail?type=' + type);
+        const data = await res.json();
+        const el = document.getElementById('mail-list');
+        if (data.length === 0) { el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">No messages</div>'; return; }
+        el.innerHTML = data.map(m => `
+            <div class="glass" style="padding:16px;margin-bottom:8px;border-radius:var(--radius-sm);${!m.is_read && type==='inbox' ? 'border-left:3px solid var(--accent);' : ''}">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+                    <div><strong>${m.subject}</strong> <span style="font-size:0.8rem;color:var(--text-secondary);">from ${m.sender_name}</span></div>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">${m.created_at ? new Date(m.created_at).toLocaleString() : ''}</span>
+                </div>
+                <p style="color:var(--text-secondary);font-size:0.9rem;white-space:pre-wrap;">${m.message}</p>
+            </div>
+        `).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function sendMail() {
+    const receiver_id = document.getElementById('mail-receiver').value;
+    const subject = document.getElementById('mail-subject').value.trim();
+    const message = document.getElementById('mail-message').value.trim();
+    if (!receiver_id || !subject || !message) { showNotification('All fields required', 'error'); return; }
+    showLoading();
+    try {
+        const res = await fetch('{{ url_for("send_admin_mail") }}', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receiver_id, subject, message })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) { showNotification('Mail sent!', 'success'); document.getElementById('mail-subject').value = ''; document.getElementById('mail-message').value = ''; }
+        else { showNotification(data.error || 'Failed', 'error'); }
+    } catch (e) { hideLoading(); showNotification('Error', 'error'); }
+}
+</script>
+{% endblock %}

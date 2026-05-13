@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}My Tasks{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+    <nav class="dashboard-nav glass">
+        <div class="nav-brand"><i class="fas fa-brain"></i><span>FaceTrack</span></div>
+        <div class="nav-links" style="display:flex;gap:8px;">
+            <a href="{{ url_for('employee_dashboard') }}" class="nav-link"><i class="fas fa-home"></i></a>
+            <a href="{{ url_for('employee_tasks') }}" class="nav-link"><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{{ url_for('employee_mail') }}" class="nav-link"><i class="fas fa-envelope"></i> Mail</a>
+            <a href="{{ url_for('employee_salary') }}" class="nav-link"><i class="fas fa-money-bill-wave"></i> Salary</a>
+        </div>
+        <div class="nav-user">
+            <span class="nav-greeting"><i class="fas fa-user-tie"></i> {{ employee_name }}</span>
+            <a href="{{ url_for('logout') }}" class="nav-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+    <div class="dashboard-content">
+        <div class="welcome-section">
+            <h1><span class="gradient-text">My Tasks</span></h1>
+            <p>View and update your assigned tasks</p>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:20px;">
+            <button class="btn-sm btn-primary" onclick="loadTasks('')"><i class="fas fa-list"></i> All</button>
+            <button class="btn-sm btn-secondary" onclick="loadTasks('pending')"><i class="fas fa-clock"></i> Pending</button>
+            <button class="btn-sm btn-accent" onclick="loadTasks('in_progress')" style="background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);padding:8px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;"><i class="fas fa-spinner"></i> In Progress</button>
+            <button class="btn-sm btn-success" onclick="loadTasks('completed')"><i class="fas fa-check"></i> Completed</button>
+        </div>
+        <div class="dashboard-card glass">
+            <div class="card-header">
+                <h2><i class="fas fa-tasks"></i> Assigned Tasks</h2>
+                <button class="btn-primary" onclick="loadTasks()"><i class="fas fa-sync"></i> Refresh</button>
+            </div>
+            <div class="card-body" id="tasks-container">
+                <p style="color:var(--text-muted);text-align:center;padding:40px;">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => loadTasks());
+
+async function loadTasks(status = '') {
+    let url = '{{ url_for("get_employee_tasks") }}';
+    if (status) url += '?status=' + status;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const el = document.getElementById('tasks-container');
+        if (data.length === 0) { el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">No tasks assigned</p>'; return; }
+        el.innerHTML = data.map(t => {
+            const pColors = { low: 'var(--success)', medium: 'var(--warning)', high: 'var(--danger)' };
+            const sColors = { pending: 'var(--text-muted)', in_progress: 'var(--accent)', completed: 'var(--success)' };
+            const statusActions = t.status !== 'completed' ? `
+                <div style="display:flex;gap:6px;margin-top:8px;">
+                    ${t.status !== 'in_progress' ? `<button class="btn-sm btn-accent" onclick="updateStatus('${t.id}','in_progress')" style="background:var(--accent);color:white;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:0.75rem;"><i class="fas fa-play"></i> Start</button>` : ''}
+                    <button class="btn-sm btn-success" onclick="updateStatus('${t.id}','completed')"><i class="fas fa-check"></i> Complete</button>
+                </div>` : '';
+            return `<div class="glass" style="padding:16px;margin-bottom:8px;border-radius:var(--radius-sm);border-left:3px solid ${pColors[t.priority]};">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <strong>${t.title}</strong>
+                        <span class="status-badge ${t.priority}" style="font-size:0.7rem;margin-left:8px;">${t.priority}</span>
+                        <span class="status-badge ${t.status}" style="font-size:0.7rem;">${t.status.replace('_',' ')}</span>
+                    </div>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">Due: ${t.due_date || 'N/A'}</span>
+                </div>
+                ${t.description ? `<p style="color:var(--text-secondary);font-size:0.85rem;margin-top:8px;">${t.description}</p>` : ''}
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                    <span style="font-size:0.75rem;color:var(--text-muted);">By: ${t.assigned_by_name}</span>
+                    ${statusActions}
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function updateStatus(taskId, status) {
+    showLoading();
+    try {
+        const res = await fetch(`/api/employee/tasks/${taskId}/status`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) { showNotification('Task updated!', 'success'); loadTasks(); }
+        else { showNotification(data.error || 'Failed', 'error'); }
+    } catch (e) { hideLoading(); showNotification('Error', 'error'); }
+}
+</script>
+<style>
+.btn-accent:hover { transform: translateY(-1px); }
+</style>
+{% endblock %}

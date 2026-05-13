@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Task Management{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+    <nav class="dashboard-nav glass">
+        <div class="nav-brand"><i class="fas fa-brain"></i><span>FaceTrack</span></div>
+        <div class="nav-links" style="display:flex;gap:8px;">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-link"><i class="fas fa-home"></i></a>
+            <a href="{{ url_for('admin_payroll') }}" class="nav-link"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+            <a href="{{ url_for('admin_ml') }}" class="nav-link"><i class="fas fa-brain"></i> ML</a>
+            <a href="{{ url_for('admin_tasks') }}" class="nav-link"><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{{ url_for('admin_mail') }}" class="nav-link"><i class="fas fa-envelope"></i> Mail</a>
+        </div>
+        <div class="nav-user">
+            <span class="nav-greeting"><i class="fas fa-user-shield"></i> {{ admin_name }}</span>
+            <a href="{{ url_for('logout') }}" class="nav-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+    <div class="dashboard-content">
+        <div class="welcome-section">
+            <h1><span class="gradient-text">Task Management</span></h1>
+            <p>Assign and track employee daily tasks</p>
+        </div>
+
+        <div class="dashboard-card glass" style="margin-bottom:24px;">
+            <div class="card-header">
+                <h2><i class="fas fa-plus-circle"></i> Create New Task</h2>
+            </div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div class="input-group">
+                        <label>Title</label>
+                        <input type="text" id="task-title" placeholder="Task title" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;">
+                    </div>
+                    <div class="input-group">
+                        <label>Assign To</label>
+                        <select id="task-assignee" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;">
+                            <option value="">Select employee...</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Due Date</label>
+                        <input type="date" id="task-due" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;">
+                    </div>
+                    <div class="input-group">
+                        <label>Priority</label>
+                        <select id="task-priority" style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;">
+                            <option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group" style="margin-top:12px;">
+                    <label>Description</label>
+                    <textarea id="task-desc" rows="3" placeholder="Task description..." style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text-primary);width:100%;resize:vertical;font-family:var(--font-main);"></textarea>
+                </div>
+                <button class="btn-success glow-btn" onclick="createTask()" style="margin-top:8px;"><i class="fas fa-plus"></i> Create Task</button>
+            </div>
+        </div>
+
+        <div class="dashboard-card glass">
+            <div class="card-header">
+                <h2><i class="fas fa-list"></i> All Tasks</h2>
+                <button class="btn-primary" onclick="loadTasks()"><i class="fas fa-sync"></i> Refresh</button>
+            </div>
+            <div class="card-body">
+                <div class="table-container">
+                    <table class="attendance-table">
+                        <thead><tr><th>Title</th><th>Assigned To</th><th>Due</th><th>Priority</th><th>Status</th><th>Created</th></tr></thead>
+                        <tbody id="task-tbody"><tr><td colspan="6" class="loading-cell">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadEmployees();
+    loadTasks();
+});
+
+async function loadEmployees() {
+    try {
+        const res = await fetch('{{ url_for("get_employees") }}');
+        const data = await res.json();
+        const sel = document.getElementById('task-assignee');
+        sel.innerHTML = '<option value="">Select employee...</option>' + data.map(e => `<option value="${e.id}">${e.name} (${e.employee_code})</option>`).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function loadTasks() {
+    try {
+        const res = await fetch('{{ url_for("get_all_tasks") }}');
+        const data = await res.json();
+        const tbody = document.getElementById('task-tbody');
+        if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">No tasks</td></tr>'; return; }
+        tbody.innerHTML = data.map(t => `<tr>
+            <td><strong>${t.title}</strong></td>
+            <td>${t.assigned_to_name} (${t.assigned_to_code})</td>
+            <td>${t.due_date || '-'}</td>
+            <td><span class="status-badge ${t.priority}">${t.priority}</span></td>
+            <td><span class="status-badge ${t.status}">${t.status}</span></td>
+            <td style="font-size:0.8rem;color:var(--text-muted);">${t.created_at ? new Date(t.created_at).toLocaleDateString() : '-'}</td>
+        </tr>`).join('');
+    } catch (e) { console.error(e); }
+}
+
+async function createTask() {
+    const title = document.getElementById('task-title').value.trim();
+    const assigned_to = document.getElementById('task-assignee').value;
+    const description = document.getElementById('task-desc').value.trim();
+    const due_date = document.getElementById('task-due').value;
+    const priority = document.getElementById('task-priority').value;
+    if (!title || !assigned_to) { showNotification('Title and assignee required', 'error'); return; }
+    showLoading();
+    try {
+        const res = await fetch('{{ url_for("create_task") }}', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, assigned_to, description, due_date, priority })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) { showNotification('Task created!', 'success'); document.getElementById('task-title').value = ''; document.getElementById('task-desc').value = ''; loadTasks(); }
+        else { showNotification(data.error || 'Failed', 'error'); }
+    } catch (e) { hideLoading(); showNotification('Error', 'error'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Employee Registration{% endblock %}
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container">
+        <div class="auth-header">
+            <a href="{{ url_for('index') }}" class="back-link"><i class="fas fa-arrow-left"></i></a>
+            <div class="auth-logo"><i class="fas fa-user-tie"></i></div>
+            <h1>Employee Registration</h1>
+            <p>Create your employee account</p>
+        </div>
+        <form class="auth-form glass" id="register-form" onsubmit="event.preventDefault(); registerEmployee();">
+            <div class="input-group">
+                <label><i class="fas fa-user"></i> Full Name</label>
+                <input type="text" id="name" placeholder="Enter your full name" required>
+            </div>
+            <div class="input-group">
+                <label><i class="fas fa-envelope"></i> Email</label>
+                <input type="email" id="email" placeholder="Enter your email" required>
+            </div>
+            <div class="input-group">
+                <label><i class="fas fa-user-tag"></i> Username</label>
+                <input type="text" id="username" placeholder="Choose a username" required>
+            </div>
+            <div class="input-group">
+                <label><i class="fas fa-id-badge"></i> Employee Code</label>
+                <input type="text" id="employee_code" placeholder="e.g. EMP001" required>
+            </div>
+            <div class="input-group">
+                <label><i class="fas fa-building"></i> Department</label>
+                <input type="text" id="department" placeholder="e.g. Engineering" required>
+            </div>
+            <div class="input-group">
+                <label><i class="fas fa-briefcase"></i> Position</label>
+                <input type="text" id="position" placeholder="e.g. Software Engineer" required>
+            </div>
+            <div class="input-group">
+                <label><i class="fas fa-lock"></i> Password</label>
+                <input type="password" id="password" placeholder="Create a password" required>
+            </div>
+            <div class="input-group">
+                <label><i class="fas fa-lock"></i> Confirm Password</label>
+                <input type="password" id="confirm-password" placeholder="Confirm password" required>
+            </div>
+            <button type="submit" class="btn-primary glow-btn">
+                <i class="fas fa-user-plus"></i> Register
+                <div class="btn-glow"></div>
+            </button>
+        </form>
+        <div class="auth-footer">
+            <p>Already have an account? <a href="{{ url_for('employee_login') }}">Login here</a></p>
+            <p>After registration, login to <strong>register your face</strong> for attendance.</p>
+        </div>
+    </div>
+</div>
+<script>
+async function registerEmployee() {
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const username = document.getElementById('username').value.trim();
+    const employee_code = document.getElementById('employee_code').value.trim();
+    const department = document.getElementById('department').value.trim();
+    const position = document.getElementById('position').value.trim();
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm-password').value;
+    if (!name || !email || !username || !employee_code || !department || !position || !password) {
+        showNotification('All fields are required', 'error'); return;
+    }
+    if (password !== confirm) { showNotification('Passwords do not match', 'error'); return; }
+    if (password.length < 6) { showNotification('Password must be at least 6 characters', 'error'); return; }
+    showLoading();
+    try {
+        const res = await fetch('{{ url_for("employee_register") }}', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, username, employee_code, department, position, password })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) { showNotification('Registration successful! Please login.', 'success'); setTimeout(() => { window.location.href = '{{ url_for("employee_login") }}'; }, 1500); }
+        else { showNotification(data.error || 'Registration failed', 'error'); }
+    } catch (err) { hideLoading(); showNotification('Connection error', 'error'); }
+}
+</script>
+{% endblock %}

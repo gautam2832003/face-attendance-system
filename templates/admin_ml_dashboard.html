@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}ML Dashboard{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+    <nav class="dashboard-nav glass">
+        <div class="nav-brand"><i class="fas fa-brain"></i><span>FaceTrack</span></div>
+        <div class="nav-links" style="display:flex;gap:8px;">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-link"><i class="fas fa-home"></i></a>
+            <a href="{{ url_for('admin_payroll') }}" class="nav-link"><i class="fas fa-money-bill-wave"></i> Payroll</a>
+            <a href="{{ url_for('admin_ml') }}" class="nav-link"><i class="fas fa-brain"></i> ML</a>
+            <a href="{{ url_for('admin_tasks') }}" class="nav-link"><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{{ url_for('admin_mail') }}" class="nav-link"><i class="fas fa-envelope"></i> Mail</a>
+        </div>
+        <div class="nav-user">
+            <span class="nav-greeting"><i class="fas fa-user-shield"></i> {{ admin_name }}</span>
+            <a href="{{ url_for('logout') }}" class="nav-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+    <div class="dashboard-content">
+        <div class="welcome-section">
+            <h1><span class="gradient-text">ML Model Training</span></h1>
+            <p>Train and compare Random Forest, SVM, and Decision Tree models on face recognition data</p>
+        </div>
+
+        <div class="stats-row" id="model-stats" style="display:none;">
+            <div class="stat-card glass stat-primary">
+                <div class="stat-icon"><i class="fas fa-database"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="ml-samples">0</span>
+                    <span class="stat-label">Training Samples</span>
+                </div>
+            </div>
+            <div class="stat-card glass stat-success">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="ml-classes">0</span>
+                    <span class="stat-label">Employee Classes</span>
+                </div>
+            </div>
+            <div class="stat-card glass stat-accent">
+                <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="ml-best-model">N/A</span>
+                    <span class="stat-label">Best Model</span>
+                </div>
+            </div>
+            <div class="stat-card glass" style="border-color:var(--accent);">
+                <div class="stat-icon"><i class="fas fa-calendar"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="ml-trained-at">Never</span>
+                    <span class="stat-label">Last Trained</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-card glass" style="margin-bottom:24px;">
+            <div class="card-header">
+                <h2><i class="fas fa-database"></i> Dataset & Training Controls</h2>
+            </div>
+            <div class="card-body">
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+                    <button class="btn-primary glow-btn" onclick="checkStatus()"><i class="fas fa-sync"></i> Check Status</button>
+                    <button class="btn-success glow-btn" onclick="trainModels()"><i class="fas fa-brain"></i> Train All Models</button>
+                    <button class="btn-accent glow-btn" onclick="generateDataset()" style="background:var(--gradient-2);color:white;border:none;border-radius:var(--radius-sm);padding:14px 28px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-weight:600;"><i class="fas fa-file-csv"></i> Generate CSV Dataset</button>
+                    <button class="btn-secondary" onclick="loadEmployeesWithFace()"><i class="fas fa-users"></i> Face Data Status</button>
+                </div>
+                <div id="face-employees-list" style="display:none;margin-bottom:16px;">
+                    <h4 style="margin-bottom:8px;color:var(--text-secondary);">Employees with registered faces:</h4>
+                    <div id="face-emp-count" style="color:var(--accent);font-weight:600;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid" id="model-cards" style="display:none;">
+            <div class="dashboard-card glass" id="card-rf">
+                <div class="card-header"><h2><i class="fas fa-tree"></i> Random Forest</h2></div>
+                <div class="card-body" id="rf-results"><p style="color:var(--text-muted);">Not trained yet</p></div>
+            </div>
+            <div class="dashboard-card glass" id="card-svm">
+                <div class="card-header"><h2><i class="fas fa-project-diagram"></i> SVM (RBF)</h2></div>
+                <div class="card-body" id="svm-results"><p style="color:var(--text-muted);">Not trained yet</p></div>
+            </div>
+            <div class="dashboard-card glass" id="card-dt">
+                <div class="card-header"><h2><i class="fas fa-sitemap"></i> Decision Tree</h2></div>
+                <div class="card-body" id="dt-results"><p style="color:var(--text-muted);">Not trained yet</p></div>
+            </div>
+        </div>
+
+        <div class="dashboard-card glass" id="chart-section" style="display:none;margin-top:24px;">
+            <div class="card-header"><h2><i class="fas fa-chart-bar"></i> Model Comparison</h2></div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;" id="comparison-chart"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => { checkStatus(); });
+
+async function checkStatus() {
+    try {
+        const res = await fetch('{{ url_for("ml_status") }}');
+        const data = await res.json();
+        if (data.trained) {
+            document.getElementById('model-stats').style.display = 'grid';
+            document.getElementById('model-cards').style.display = 'grid';
+            document.getElementById('chart-section').style.display = 'block';
+            document.getElementById('ml-samples').textContent = data.n_samples;
+            document.getElementById('ml-classes').textContent = data.n_classes;
+            document.getElementById('ml-best-model').textContent = data.best_model;
+            document.getElementById('ml-trained-at').textContent = data.trained_at ? new Date(data.trained_at).toLocaleString() : 'N/A';
+            const models = ['Random Forest', 'SVM (RBF)', 'Decision Tree'];
+            const ids = ['rf', 'svm', 'dt'];
+            models.forEach((name, i) => {
+                const r = data.results[name];
+                const el = document.getElementById(ids[i] + '-results');
+                if (r && !r.error) {
+                    el.innerHTML = `
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="stat-card glass" style="padding:12px;"><span style="color:var(--success);font-size:1.5rem;font-weight:700;">${r.accuracy}%</span><br><span style="color:var(--text-secondary);font-size:0.8rem;">Accuracy</span></div>
+                            <div class="stat-card glass" style="padding:12px;"><span style="color:var(--accent);font-size:1.5rem;font-weight:700;">${r.precision}%</span><br><span style="color:var(--text-secondary);font-size:0.8rem;">Precision</span></div>
+                            <div class="stat-card glass" style="padding:12px;"><span style="color:var(--primary);font-size:1.5rem;font-weight:700;">${r.recall}%</span><br><span style="color:var(--text-secondary);font-size:0.8rem;">Recall</span></div>
+                            <div class="stat-card glass" style="padding:12px;"><span style="color:var(--warning);font-size:1.5rem;font-weight:700;">${r.f1_score}%</span><br><span style="color:var(--text-secondary);font-size:0.8rem;">F1 Score</span></div>
+                        </div>
+                        <div style="margin-top:12px;color:var(--text-muted);font-size:0.8rem;">Train: ${r.train_samples} | Test: ${r.test_samples} | CV: ${r.cv_mean}%</div>
+                    `;
+                } else {
+                    el.innerHTML = `<p style="color:var(--danger);">${r ? r.error : 'Error'}</p>`;
+                }
+            });
+            const chart = document.getElementById('comparison-chart');
+            chart.innerHTML = models.map(name => {
+                const r = data.results[name];
+                if (!r || r.error) return '';
+                return `<div class="stat-card glass" style="flex-direction:column;text-align:center;padding:16px;">
+                    <h4 style="margin-bottom:8px;font-size:0.9rem;">${name}</h4>
+                    <div style="position:relative;height:120px;width:100%;display:flex;align-items:end;gap:4px;justify-content:center;">
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                            <div style="height:${r.accuracy}px;width:28px;background:var(--gradient-1);border-radius:4px 4px 0 0;transition:height 0.5s;"></div>
+                            <span style="font-size:0.65rem;color:var(--text-muted);">Acc</span>
+                        </div>
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                            <div style="height:${r.precision}px;width:28px;background:var(--gradient-2);border-radius:4px 4px 0 0;transition:height 0.5s;"></div>
+                            <span style="font-size:0.65rem;color:var(--text-muted);">Prec</span>
+                        </div>
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                            <div style="height:${r.recall}px;width:28px;background:var(--gradient-3);border-radius:4px 4px 0 0;transition:height 0.5s;"></div>
+                            <span style="font-size:0.65rem;color:var(--text-muted);">Rec</span>
+                        </div>
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                            <div style="height:${r.f1_score}px;width:28px;background:linear-gradient(135deg,var(--primary),var(--accent));border-radius:4px 4px 0 0;transition:height 0.5s;"></div>
+                            <span style="font-size:0.65rem;color:var(--text-muted);">F1</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            document.getElementById('model-stats').style.display = 'none';
+            document.getElementById('model-cards').style.display = 'none';
+            document.getElementById('chart-section').style.display = 'none';
+            document.getElementById('ml-trained-at').textContent = 'Not Trained';
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function trainModels() {
+    showLoading();
+    try {
+        const res = await fetch('{{ url_for("ml_train") }}', { method: 'POST' });
+        const data = await res.json();
+        hideLoading();
+        if (res.ok) {
+            showNotification('Models trained successfully!', 'success');
+            checkStatus();
+        } else {
+            showNotification(data.error || 'Training failed', 'error');
+        }
+    } catch (e) { hideLoading(); showNotification('Connection error', 'error'); }
+}
+
+async function generateDataset() {
+    showLoading();
+    try {
+        const res = await fetch('{{ url_for("ml_get_dataset") }}');
+        const data = await res.json();
+        hideLoading();
+        if (data.dataset_exists) {
+            showNotification(`Dataset generated with ${data.rows} rows!`, 'success');
+            if (data.download_url) {
+                window.open(data.download_url, '_blank');
+            }
+        } else {
+            showNotification(data.message || 'No face data', 'error');
+        }
+    } catch (e) { hideLoading(); showNotification('Error', 'error'); }
+}
+
+async function loadEmployeesWithFace() {
+    try {
+        const res = await fetch('{{ url_for("ml_employees_with_face") }}');
+        const data = await res.json();
+        const el = document.getElementById('face-employees-list');
+        el.style.display = 'block';
+        document.getElementById('face-emp-count').textContent = `${data.length} employees have registered faces`;
+    } catch (e) { console.error(e); }
+}
+</script>
+<style>
+.btn-accent:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+</style>
+{% endblock %}
